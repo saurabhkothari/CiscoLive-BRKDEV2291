@@ -1,0 +1,4 @@
+tenant,vrf,app,epg,bridgedomain,gateway,mask,state
+brkdev2291,Prod,MyApp,web,BD-web,192.168.100.254,24,present
+brkdev2291,Prod,MyApp,db,BD-db,192.168.101.254,24,present
+brkdev2291,Prod,MyApp,app,BD-app,192.168.102.254,24,present

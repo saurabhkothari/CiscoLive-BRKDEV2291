@@ -1,0 +1,117 @@
+---
+- name: Onboard 3tier App
+  hosts: apic
+  connection: local
+  gather_facts: false
+  
+  vars:
+    aci_login: &aci_login
+      hostname: '{{ apic_host }}'
+      username: '{{ apic_user }}'
+      password: '{{ apic_password | regex_escape() }}'
+      use_proxy: '{{ apic_use_proxy }}'
+      validate_certs: '{{ apic_validate_certs }}'
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name:
+    block:
+      - name: "Read Tenant information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name:  "Creating Tenant"
+        aci_tenant:
+          <<: *aci_login
+          tenant:  "{{ index.tenant }}"
+          description: "Tenant {{ index.tenant }}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+
+
+      - name: "Read VRF information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name: "Creating VRF"
+        aci_vrf:
+          <<: *aci_login
+          tenant: "{{ index.tenant }}"
+          vrf_name: "{{ index.vrf }}"
+          description: "VRF {{ index.vrf }}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+
+
+      - name: "Read BD VRF information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name: "Create a Bridge Domain"
+        aci_bd:
+          <<: *aci_login
+          tenant: "{{ index.tenant }}"
+          vrf_name: "{{ index.vrf }}"
+          bd: "{{ index.bridgedomain }}"
+          description: "Bridge Domain {{ index.bridgedomain }}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+
+
+      - name: "Read BD Gateway Mask information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name: "Create a subnet mask"
+        aci_bd_subnet:
+          <<: *aci_login
+          tenant: "{{ index.tenant }}"
+          bd: "{{ index.bridgedomain }}"
+          gateway: "{{ index.gateway }}"
+          mask: "{{ index.mask }}"
+          description: "GW-Mask {{ index.gateway }} {{index.mask}}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+
+      - name: "Read APP information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name: "Add a new AP"
+        aci_ap:
+          <<: *aci_login
+          tenant: "{{ index.tenant }}"
+          ap: "{{ index.app }}"
+          description: "ANP {{ index.app }}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+
+      - name: "Read EPG information"
+        read_csv:
+          path: config.csv
+        register: aci_config
+      - name: "Create EPGs"
+        aci_epg:
+          <<: *aci_login
+          tenant: "{{ index.tenant }}"
+          ap: "{{ index.app }}"
+          epg: "{{ index.epg }}"
+          bd: "{{ index.bridgedomain }}"
+          description: "EPG {{ index.epg }}"
+          state: "{{ index.state }}"
+        loop: "{{ aci_config.list }}"
+        loop_control:
+          loop_var: index
+    delegate_to: localhost   

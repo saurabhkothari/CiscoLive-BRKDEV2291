@@ -1,0 +1,120 @@
+pipeline {
+    agent { label 'ciscolive-nae' }
+    parameters
+    {
+     string(name: "APICIP", defaultValue: '10.106.236.50', description: "APIC IP")
+     string(name: "APICUSER", defaultValue: 'admin', description: "APIC User Name")
+     string(name: "NAEIP", defaultValue: '10.76.101.142', description: "NAE IP")
+     string(name: "NAEUSER", defaultValue: 'admin', description: "NAE User Name")
+    }
+    environment {
+        
+        WEBEXAUTH = credentials('webex-auth-token')
+        WEBEXROOM = credentials('webex-roomid')
+        APICHOST = "$params.APICIP"
+        APICUSER = "$params.APICUSER"
+        APICPASSWORD = credentials('apic_password')
+        NAEHOST = "$params.NAEIP"
+        NAEUSER = "$params.NAEUSER"
+        NAEPASSWORD = credentials('nae_password')
+   }
+    stages {
+        stage('Git Checkout') {
+
+            steps {
+            git branch: 'main', url: 'https://github.com/saurabhkothari/jenkins-ansible.git'
+           
+            }
+        }
+        stage('Generate Tenant Config'){
+  
+            steps {
+             
+                ansiColor('xterm') {
+                
+                            ansiblePlaybook(
+                             playbook: 'tenant-config.yaml' ,
+                             inventory: 'inventory',
+                             extras: '--check -vvv',
+                             extraVars: [
+                                        "apic_host": "${APICHOST}",
+                                        "apic_user": "${APICUSER}",
+                                        "apic_password": "${APICPASSWORD}",
+                                        ],
+                             colorized: true)
+                        } 
+                }         
+            }
+        stage('PreChange Analysis'){
+  
+            steps {
+                
+                ansiColor('xterm') {
+                
+                            ansiblePlaybook(
+                             playbook: 'prechange-analysis.yaml' ,
+                             inventory: 'inventory',
+                             extraVars: [
+                                        "nae_host": "${NAEHOST}",
+                                        "nae_user": "${NAEUSER}",
+                                        "nae_password": "${NAEPASSWORD}",
+                                        ],
+                             colorized: true)
+                        } 
+                    }   
+            }
+        stage('Deploy Tenant Config'){
+  
+            steps {
+                
+                ansiColor('xterm') {
+                
+                            ansiblePlaybook(
+                             playbook: 'tenant-config.yaml' ,
+                             inventory: 'inventory',
+                             extraVars: [
+                                        "apic_host": "${APICHOST}",
+                                        "apic_user": "${APICUSER}",
+                                        "apic_password": "${APICPASSWORD}",
+                                        ],
+                             colorized: true)
+                        } 
+                }         
+            }    
+              
+              
+    }
+   post { 
+        success { 
+            node("ciscolive") {
+            wrap([$class: 'BuildUser']) {
+            sh """
+                    curl --location --request POST 'https://webexapis.com/v1/messages' \
+--header "Authorization: Bearer ${WEBEXAUTH}" \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "roomId": "${WEBEXROOM}",
+  
+  "markdown": "Started at: ${BUILD_TIMESTAMP}\\nAuthor:${env.BUILD_USER}(${env.BUILD_USER_EMAIL})\\nJob URL: ${Job_URL}\\nBuild ID: ${BUILD_NUMBER}\\nBuild Logs: ${BUILD_URL}consoleText\\nResult: ${currentBuild.currentResult}" 
+}'
+         """
+                }
+            }
+        }
+        failure { 
+            node("ciscolive") {
+            sh """
+                    curl --location --request POST 'https://webexapis.com/v1/messages' \
+--header "Authorization: Bearer ${WEBEXAUTH}" \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "roomId": "${WEBEXROOM}",
+  
+  "markdown": "Started at: ${BUILD_TIMESTAMP}\\nAuthor:${env.BUILD_USER}(${env.BUILD_USER_EMAIL})\\nJob URL: ${Job_URL}\\nBuild ID: ${BUILD_NUMBER}\\nBuild Logs: ${BUILD_URL}consoleText\\nResult: ${currentBuild.currentResult}" 
+}'
+         """
+            } 
+        }
+    }
+}
+

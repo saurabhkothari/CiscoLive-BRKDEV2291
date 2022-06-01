@@ -1,0 +1,35 @@
+---
+- name: Pre-Change Analysys
+  hosts: nae
+  connection: local
+  gather_facts: no
+
+  vars:
+    nae_login: &nae_login
+        host: "{{ nae_host }}"
+        username: "{{ nae_user }}"
+        password: "{{ nae_password }}" 
+        validate_certs: "{{ nae_validate_certs }}"
+  
+  vars_files:
+    - vars.yml                  
+
+  tasks:
+  - name:  Pre-change Analysis
+    block: 
+      - name: Create pre-change analysis
+        cisco.nae.nae_prechange:
+          <<: *nae_login
+          ag_name: "{{ AssuranceGroup }}"
+          name: "{{ PreChangeAnalysisName }}"
+          state: present
+          verify: true
+          file: config.json
+      - name: Get PCV Result
+        cisco.nae.nae_prechange:
+          <<: *nae_login
+          ag_name: "{{ AssuranceGroup }}"
+          name: "{{ PreChangeAnalysisName }}"
+          state: query
+          verify: True         
+    delegate_to: localhost

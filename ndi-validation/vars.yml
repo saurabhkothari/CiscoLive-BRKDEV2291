@@ -1,0 +1,18 @@
+apic_host: 
+apic_use_proxy: no
+apic_validate_certs: no
+apic_user: 
+apic_password: 
+tenant:      "brkdev2291"
+vrf_name:    "Prod"
+bd:          "BD-cache"
+gateway: 192.168.102.254
+subnet: 24
+
+
+nae_host:
+nae_user:
+nae_password:
+nae_validate_certs: no
+PreChangeAnalysisName: "brkdev2291"
+AssuranceGroup: "demo"

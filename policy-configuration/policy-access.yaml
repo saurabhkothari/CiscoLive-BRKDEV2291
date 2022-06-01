@@ -1,0 +1,126 @@
+- hosts: apic
+  gather_facts: no
+  
+  vars:
+    aci_login: &aci_login
+      hostname: '{{ apic_host }}'
+      username: '{{ apic_user }}'
+      #private_key: "{{ private_key }}"
+      password: '{{ apic_password | regex_escape() }}'
+      use_proxy: '{{ apic_use_proxy }}'
+      validate_certs: '{{ apic_validate_certs }}'
+
+  vars_files:
+    - vars.yml  
+
+  tasks:
+  - name: Access Policies
+    block:
+        - name: Create Leaf Profile 
+          aci_switch_policy_leaf_profile:
+            <<: *aci_login
+            leaf_profile: "{{ access.leaf_profile.name }}"
+            state: "{{ access.leaf_profile.state }}"
+
+        - name: Bind leaf selectors to switch policy leaf profile
+          aci_switch_leaf_selector:
+            <<: *aci_login
+            leaf: "{{ access.leaf_selector.name }}"
+            leaf_node_blk: "{{ access.leaf_selector.blk }}"
+            from: "{{ access.leaf_selector.id.from }}"
+            to: "{{ access.leaf_selector.id.to }}"
+            leaf_profile: "{{ access.leaf_profile.name }}"
+            state: "{{ access.leaf_selector.state }}"
+
+
+        - name: Add a new VLAN pool
+          aci_vlan_pool:
+            <<: *aci_login
+            pool: "{{ access.vlan.pool_name }}"
+            pool_allocation_mode: "{{ access.vlan.mode }}"
+            state: "{{ access.vlan.state }}"
+
+        - name: Add a new VLAN encap block
+          aci_vlan_pool_encap_block:
+            <<: *aci_login
+            pool: "{{ access.vlan.pool_name }}"
+            block_name: "{{ access.vlan.pool_name }}_VLANBlock"
+            block_start: "{{ access.vlan.encap.block.start }}"
+            block_end: "{{ access.vlan.encap.block.end }}"
+            pool_allocation_mode: "{{ access.vlan.encap.block.mode }}"
+            state: "{{ access.vlan.encap.block.state }}"
+
+
+        - name: Add a new physical domain
+          aci_domain:
+            <<: *aci_login
+            domain: "{{ access.phys_dom.name }}"
+            domain_type: "{{ access.phys_dom.type }}"
+            state: "{{ access.phys_dom.state }}"
+
+        - name: Bind a physical domain to VLAN pool
+          aci_domain_to_vlan_pool:
+            <<: *aci_login
+            domain: "{{ access.phys_dom.name }}"
+            domain_type: "{{ access.phys_dom.type }}"
+            pool: "{{ access.vlan.pool_name }}"
+            pool_allocation_mode: "{{ access.vlan.mode }}"
+            state: "{{ access.phys_vlan_bind.state }}"
+
+        - name: Add a new AEP
+          aci_aep:
+            <<: *aci_login
+            aep: "{{ access.aep.name }}"
+            infra_vlan: "{{ access.aep.infra_vlan }}"
+            state: "{{ access.aep.state }}"
+
+        - name: Add AEP to domain binding
+          aci_aep_to_domain:
+            <<: *aci_login
+            aep: "{{ access.aep.name }}"
+            domain: "{{ access.phys_dom.name }}"
+            domain_type: "{{ access.phys_dom.type }}"
+            state: "{{ access.aep_bind.state }}"
+
+        - name: Create a Leaf Access Port Policy Group
+          aci_interface_policy_leaf_policy_group:
+            <<: *aci_login
+            lag_type: "{{ access.leaf_pol_grp.lag_type }}"
+            policy_group: "{{ access.leaf_pol_grp.pol_grp }}"
+            aep: "{{ access.aep.name }}"
+            cdp_policy: "{{ access.leaf_pol_grp.cdp }}"
+            lldp_policy: "{{ access.leaf_pol_grp.lldp }}"
+            state: "{{ access.leaf_pol_grp.state }}"
+
+        - name: Add a new leaf_interface_profile
+          aci_interface_policy_leaf_profile:
+            <<: *aci_login
+            leaf_interface_profile: "{{ access.leaf_int_prof.name }}"
+            state: "{{ access.leaf_int_prof.state }}"
+
+
+        - name: Associating an interface selector profile to a switch policy leaf profile
+          aci_interface_selector_to_switch_policy_leaf_profile:
+            <<: *aci_login
+            leaf_profile: "{{ access.leaf_profile.name }}"
+            interface_selector: "{{ access.leaf_int_prof.name }}"
+            state: "{{ access.int_sel_to_sw_prof.state }}"
+
+        - name: Associate an Interface Access Port Selector to an Interface Policy Leaf Profile with a Policy Group
+          aci_access_port_to_interface_policy_leaf_profile:
+            <<: *aci_login
+            leaf_interface_profile: "{{ access.leaf_int_prof.name }}"
+            access_port_selector: "{{ access.int_port_sel_to_int_pol.port_sel }}"
+            policy_group: "{{ access.leaf_pol_grp.pol_grp }}"
+            state: "{{ access.int_port_sel_to_int_pol.state }}"
+
+        - name: Associate an access port block (single port) to an interface selector
+          aci_access_port_block_to_access_port:
+            <<: *aci_login
+            leaf_interface_profile: "{{ access.leaf_int_prof.name }}"
+            access_port_selector: "{{ access.int_port_sel_to_int_pol.port_sel }}"
+            leaf_port_blk: "{{ access.int_port_sel_to_int_pol.port_sel }}"
+            from_port: "{{ access.access_port_to_int_sel.from_port  }}"
+            to_port: "{{ access.access_port_to_int_sel.to_port  }}"
+            state: "{{ access.access_port_to_int_sel.state }}"
+    delegate_to: localhost

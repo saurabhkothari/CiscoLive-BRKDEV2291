@@ -1,0 +1,90 @@
+apic_host: 
+apic_use_proxy: no
+apic_validate_certs: no
+apic_user: 
+apic_password: 
+api_path:
+ firmware_nodes: "/api/node/class/fabricNode.json"
+ pending_registration: /api/node/class/dhcpClient.json?query-target-filter=and(or(eq(dhcpClient.ip,"0.0.0.0")),or(eq(dhcpClient.nodeRole,"spine"),eq(dhcpClient.nodeRole,"leaf"),eq(dhcpClient.nodeRole,"unsupported")))
+ registered_nodes: "/api/node/mo/uni/controller/nodeidentpol.json"
+ discovered_nodes: "/api/node/class/fabricNode.json"
+ bdSubnet: "/api/node/class/fvBD.json?rsp-subtree=children"
+ dns_config: "/api/node/mo/uni/fabric.json"  
+ ntp_config: "/api/node/mo/uni/fabric/time-ntp-pol.json"
+
+apic_encryption_passphrase: 
+
+fabric:
+  pol:
+   name: "dns-pol"
+  dns1: 172.13.12.145
+  dns2: 172.14.56.122
+  domain: "lab.local"
+  ntp: 
+   name: "ntp-pol"
+   ip: 172.15.212.41
+
+access:
+ access_port_to_int_sel:
+  from_port: 26
+  to_port: 26
+  state: present
+  
+ int_port_sel_to_int_pol:
+  port_sel: E1-26
+  state: present
+
+ int_sel_to_sw_prof:
+  state: present
+ 
+ leaf_int_prof:
+  name: Leaf101_IntProf
+  state: present
+ 
+ leaf_pol_grp:
+   lag_type: leaf
+   pol_grp: IPG
+   cdp: CDP_ENABLE
+   lldp: LLDP_ENABLE
+   state: present
+
+ aep_bind:
+  state: present
+
+ aep:
+  name: aep-pol
+  infra_vlan: False
+  state: present
+
+ phys_vlan_bind:
+  state: present
+ phys_dom:
+  name: "Phys"
+  type: phys
+  state: present
+ 
+ vlan: 
+  pool_name: "vlan_pool_test"
+  mode: static
+  state: present
+  encap:
+    block:
+      start: 3001
+      end: 3001
+      mode: static
+      state: present
+
+ leaf_profile:
+  name: leaf-101_lp
+  state: present
+
+ leaf_selector:
+  name: "Leaf-101_Sel"
+  blk: "Leaf101"
+  id:
+   from: 101
+   to: 101
+  state: present
+ 
+ 
+ 

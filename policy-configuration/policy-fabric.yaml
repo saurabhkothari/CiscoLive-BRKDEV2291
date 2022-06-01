@@ -1,0 +1,82 @@
+- hosts: apic
+  gather_facts: no
+    
+  vars:
+    aci_login: &aci_login
+      hostname: '{{ apic_host }}'
+      username: '{{ apic_user }}'
+      #private_key: "{{ private_key }}"
+      password: '{{ apic_password | regex_escape() }}'
+      use_proxy: '{{ apic_use_proxy }}'
+      validate_certs: '{{ apic_validate_certs }}'
+
+  vars_files:
+    - vars.yml     
+  
+  tasks: 
+  - name: Fabric Policies
+    block: 
+        - name: OOB IP
+          aci_rest:
+            <<: *aci_login
+            method: get
+            path: "{{ api_path.firmware_nodes }}"
+          delegate_to: localhost    
+          register: result
+
+        - name: Query
+          set_fact:
+              SW_ID: "{{ result | json_query(\"imdata[*].fabricNode.attributes | [?role!='controller'].id\") | to_json }}"
+        
+        - debug:
+            var: SW_ID
+
+        - name: Add ipv4 address to out of band mgmt interface
+          cisco.aci.aci_static_node_mgmt_address:
+                <<: *aci_login
+                epg: default
+                pod_id: 1
+                type: out_of_band
+                node_id: "{{ item }}"
+                ipv4_address: "10.10.10.{{ item }}/24"
+                ipv4_gw: "10.10.10.1"
+                state: present
+          loop: "{{ SW_ID }}"
+
+        - name: DNS 
+          aci_rest:
+              <<: *aci_login
+              method: post
+              path: "{{ api_path.dns_config }}"
+              content: {"dnsProfile":{"attributes":{"dn":"uni/fabric/dnsp-{{ fabric.pol.name }}","name":"{{ fabric.pol.name }}","rn":"dnsp-{{ fabric.pol.name }}","status":"created"},"children":[{"dnsDomain":{"attributes":{"dn":"uni/fabric/dnsp-{{ fabric.pol.name }}/dom-{{ fabric.domain }}","name":"{{ fabric.domain }}","rn":"dom-{{ fabric.domain }}","status":"created"},"children":[]}},{"dnsProv":{"attributes":{"dn":"uni/fabric/dnsp-{{ fabric.pol.name }}/prov-[{{ fabric.dns1 }}]","addr":"{{ fabric.dns1 }}","rn":"prov-[{{ fabric.dns1 }}]","status":"created"},"children":[]}},{"dnsProv":{"attributes":{"dn":"uni/fabric/dnsp-{{ fabric.pol.name }}/prov-[{{ fabric.dns2 }}]","addr":"{{ fabric.dns2 }}","preferred":"true","rn":"prov-[{{ fabric.dns2 }}]","status":"created"},"children":[]}},{"dnsRsProfileToEpg":{"attributes":{"tDn":"uni/tn-mgmt/mgmtp-default/oob-default","status":"created"},"children":[]}}]}}
+          delegate_to: localhost    
+          register: result
+
+        - name: NTP 
+          aci_rest:
+              <<: *aci_login
+              method: post
+              path: "{{ api_path.ntp_config }}"
+              content: {"datetimePol":{"attributes":{"dn":"uni/fabric/time-{{ fabric.ntp.name }}","name":"{{ fabric.ntp.name }}","rn":"time-{{ fabric.ntp.name }}","status":"created"},"children":[{"datetimeNtpProv":{"attributes":{"dn":"uni/fabric/time-{{ fabric.ntp.name }}/ntpprov-{{ fabric.ntp.ip }}","name":"{{ fabric.ntp.ip }}","rn":"ntpprov-{{ fabric.ntp.ip }}","status":"created"},"children":[{"datetimeRsNtpProvToEpg":{"attributes":{"tDn":"uni/tn-mgmt/mgmtp-default/oob-default","status":"created"},"children":[]}}]}}]}}
+          delegate_to: localhost    
+          register: result
+
+        - name: Configure encryption passphrase for config import/export
+          aci_rest:
+                  <<: *aci_login
+                  path: "/api/node/mo/uni/exportcryptkey.json"
+                  method: post
+                  content:
+                    pkiExportEncryptionKey:
+                      attributes:
+                        strongEncryptionEnabled: 'true'
+                        passphrase: '{{ apic_encryption_passphrase }}'
+          register: result
+          retries: 2
+          delay: 3
+          until: result is succeeded
+    delegate_to: localhost
+
+      
+
+  

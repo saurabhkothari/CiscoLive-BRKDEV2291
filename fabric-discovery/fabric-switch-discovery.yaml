@@ -1,0 +1,113 @@
+- name: Discover ACI Switches
+  hosts: apic
+  gather_facts: no
+
+  vars:
+    aci_login: &aci_login
+      hostname: '{{ apic_host }}'
+      username: '{{ apic_user }}'
+      password: '{{ apic_password | regex_escape() }}'
+      use_proxy: '{{ apic_use_proxy }}'
+      validate_certs: '{{ apic_validate_certs }}'
+
+  vars_files:
+          - vars.yml
+  tasks:
+  - name:
+    block:
+      - name: Get Discovered Switch
+        aci_rest: 
+          <<: *aci_login
+          path: "{{ api_path.pending_registration }}"
+          method: get
+        register: result
+        retries: 100
+        delay: 10
+        until: result.totalCount != 0
+    
+      - set_fact:
+          nodeRole: "{{ result | json_query(\"imdata[*].dhcpClient.attributes.nodeRole\")  }}"   
+      
+      - set_fact:
+          nodeId: "{{ result | json_query(\"imdata[*].dhcpClient.attributes.id\")  }}"
+        when: "nodeRole[0] == 'spine'"
+      
+      - set_fact:
+          nodeId: "{{ result | json_query(\"imdata[*].dhcpClient.attributes.id\")  }}"
+        when: "nodeRole[0] == 'leaf'"
+
+      - set_fact:
+          switchId: "{{ lookup('csvfile', 'unregistered file=spine.csv delimiter=, col=2') }}"
+        when: "nodeRole[0] == 'spine'"
+    
+      - set_fact: 
+          switchId: "{{ lookup('csvfile', 'unregistered file=leaf.csv delimiter=, col=2') }}"
+        when: "nodeRole[0] == 'leaf'"
+
+      - set_fact:
+          switchName: "{{ nodeRole[0] }}-{{ switchId }}"
+        when: nodeRole[0] is defined and switchId is defined 
+    
+      - set_fact: 
+            ext_file_old: 'unregistered,{{ switchName }},{{ switchId }}'
+            ext_file_new: 'registered,{{ switchName }},{{ switchId }}'
+        when: switchId is defined
+    
+      - debug:
+                msg: "{{ switchId }} ; {{ switchName }} , {{ nodeId[0] }} , {{ nodeRole[0] }}"
+        when: switchId is defined
+
+      - name: fabric discovery
+        aci_rest: 
+            <<: *aci_login
+            path: "{{ api_path.registered_nodes }}"
+            content: | 
+                {
+                  "fabricNodeIdentP": {
+                  "attributes": {
+                    "dn": "uni/controller/nodeidentpol/nodep-{{ nodeId[0] }}",
+                    "serial": "{{ nodeId[0] }}",
+                    "nodeId": "{{ switchId }}",
+                    "name": "{{ switchName }}",
+                    "status": "created,modified"
+                  },
+                  "children": []
+                  }
+                }
+            method: post
+        when: switchId is defined
+      
+      - name: update the external spine db
+        lineinfile:
+            path: spine.csv
+            regexp: "{{ ext_file_old }}"
+            line: "{{ ext_file_new }}"
+            state: present
+        when: switchId is defined and nodeRole[0] == 'spine'
+
+      - name: update the external leaf db
+        ansible.builtin.lineinfile:
+            path: leaf.csv
+            regexp: "{{ ext_file_old }}"
+            line: "{{ ext_file_new }}"
+            state: present
+        when: switchId is defined and nodeRole[0] == 'leaf'
+
+      - name: Verify discovery 
+        aci_rest: 
+            <<: *aci_login
+            path: "{{ api_path.discovered_nodes }}"
+            method: get
+        register: reg_discovery
+        until: "'active' in reg_discovery | json_query(\"imdata[*].fabricNode.attributes |  [?name == '\" + switchName + \"'].fabricSt\")"
+        retries: 100
+        delay: 10
+        ignore_errors: yes
+      
+      - debug:
+            msg: "{{ switchName }} discovery successful"
+        when: reg_discovery is succeeded
+      - debug:
+            msg: "{{ switchName }} discovery failed"
+        when: reg_discovery is failed
+    delegate_to: localhost

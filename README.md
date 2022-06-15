@@ -5,7 +5,7 @@
 
 ### Jenkins Plugins
 
--  Simple theme [https://tobix.github.io/jenkins-neo2-theme/dist/neo-light.css]
+-  [Simple theme] (https://tobix.github.io/jenkins-neo2-theme/dist/neo-light.css)
 -  Docker 
 -  Ansible
 -  Build user vars

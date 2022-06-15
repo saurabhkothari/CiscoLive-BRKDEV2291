@@ -1,8 +1,5 @@
 # CiscoLive-BRKDEV2291
 
-
-## Steps
-
 ### Jenkins Plugins
 
 -  [Simple theme](https://tobix.github.io/jenkins-neo2-theme/dist/neo-light.css)

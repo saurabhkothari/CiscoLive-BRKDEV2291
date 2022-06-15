@@ -3,6 +3,16 @@
 
 ## Steps
 
+### Jenkins Plugins
+```html
+* simple theme - https://tobix.github.io/jenkins-neo2-theme/dist/neo-light.css
+* Docker 
+* Ansible
+* build user vars
+* Build Timestamp 
+* AnsiColor
+```
+
 ### Jenkins docker container
 ```html
 docker run -p 8080:8080 -p 50000:50000 -v /Users/saukotha/jenkins-set-up/jenkins_home:/var/jenkins_home jenkins/jenkins:lts

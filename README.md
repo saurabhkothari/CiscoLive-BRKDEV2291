@@ -6,12 +6,12 @@
 ### Jenkins Plugins
 
 -  [Simple theme](https://tobix.github.io/jenkins-neo2-theme/dist/neo-light.css)
--  Docker 
--  Ansible
--  Build user vars
--  Build Timestamp 
--  Notification
--  AnsiColor
+-  [Docker](https://plugins.jenkins.io/docker-plugin/)
+-  [Ansible](https://plugins.jenkins.io/ansible/)
+-  [Build user vars](https://plugins.jenkins.io/build-user-vars-plugin/)
+-  [Build Timestamp](https://plugins.jenkins.io/build-timestamp/)
+-  [Notification](https://plugins.jenkins.io/notification/)
+-  [AnsiColor](https://plugins.jenkins.io/ansicolor/)
 
 ### Jenkins docker container
 ```html
